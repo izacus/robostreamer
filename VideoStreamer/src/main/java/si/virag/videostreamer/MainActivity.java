@@ -19,6 +19,8 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
     private long lastTime;
     private int fpsCounter;
 
+    private VideoEncoder encoder;
+
     @Override
     protected void onCreate(Bundle savedInstanceState)
     {
@@ -55,6 +57,9 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
 
         if (cam != null)
             cam.release();
+
+        if (encoder != null)
+            encoder.close();
     }
 
     private void initCamera()
@@ -72,12 +77,15 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
         params.setRotation(90);
         params.setPreviewFpsRange(30000, 30000);
         params.setFocusMode(Camera.Parameters.FOCUS_MODE_AUTO);
-        params.setPreviewFormat(ImageFormat.YV12);
+        params.setPreviewFormat(ImageFormat.NV21);
         params.setAutoExposureLock(false);
         cam.setDisplayOrientation(90);
         cam.setParameters(params);
         cam.setPreviewCallback(this);
         cam.startPreview();
+
+        encoder = new VideoEncoder(this);
+        encoder.init();
     }
 
     @Override
@@ -109,8 +117,11 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
         {
             Log.d("VideoStreamer", "FPS: " + fpsCounter);
             lastTime = System.currentTimeMillis();
+            fpsCounter = 0;
         }
 
         fpsCounter ++;
+
+        encoder.pushBuffer(bytes);
     }
 }
