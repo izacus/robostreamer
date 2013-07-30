@@ -13,7 +13,7 @@ import java.util.List;
 /**
  * Created by Jernej on 30.7.2013.
  */
-public class VideoEncoder
+public class VideoEncoder implements Runnable
 {
 
     private List<RawImage> images = new ArrayList<RawImage>();
@@ -23,6 +23,7 @@ public class VideoEncoder
     private MediaCodec codec;
 
     private long memoryPressure = 0;
+    private boolean running = false;
 
     public VideoEncoder(Context ctx)
     {
@@ -43,53 +44,62 @@ public class VideoEncoder
 
         Log.d("VideoStreamer", "Codec configured.");
         codec.start();
+
+        running = true;
+        Thread thrd = new Thread(this);
+        thrd.start();
     }
 
     public void pushBuffer(byte[] buffer)
     {
-        MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
-        if (codec != null)
-        {
-            images.add(new RawImage(buffer));
-            memoryPressure += buffer.length;
-
-            while (images.size() > 0)
-            {
-                int bufferIndex = codec.dequeueInputBuffer(1000);
-                if (bufferIndex < 0)
-                    break;
-
-                RawImage img = images.remove(0);
-                codec.getInputBuffers()[bufferIndex].put(img.data);
-                memoryPressure -= img.data.length;
-
-                codec.queueInputBuffer(bufferIndex, 0, img.data.length, timer, 0);
-                timer += 1000000;
-            }
-
-            while (true)
-            {
-                int outputBufferIndex = codec.dequeueOutputBuffer(info, 1000);
-                if (outputBufferIndex < 0)
-                    break;
-
-                Log.i("VideoStreamer", "Output frame: " + info.size + " B, presentation time: " + info.presentationTimeUs);
-                codec.releaseOutputBuffer(outputBufferIndex, false);
-            }
-
-
-        }
-
+        images.add(new RawImage(buffer));
+        memoryPressure += buffer.length;
         Log.i("VideoStreamer", "Memory pressure " + (memoryPressure / 1000) + " kB.");
     }
 
     public void close()
     {
-        if (codec != null)
+        running = false;
+    }
+
+    @Override
+    public void run()
+    {
+        MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
+
+        while(running)
         {
-            codec.stop();
-            codec.release();
+            if (codec != null)
+            {
+
+                while (images.size() > 0)
+                {
+                    int bufferIndex = codec.dequeueInputBuffer(1000);
+                    if (bufferIndex < 0)
+                        break;
+
+                    RawImage img = images.remove(0);
+                    codec.getInputBuffers()[bufferIndex].put(img.data);
+                    memoryPressure -= img.data.length;
+
+                    codec.queueInputBuffer(bufferIndex, 0, img.data.length, timer, 0);
+                    timer += 1000000;
+                }
+
+                while (true)
+                {
+                    int outputBufferIndex = codec.dequeueOutputBuffer(info, 1000);
+                    if (outputBufferIndex < 0)
+                        break;
+
+                    Log.i("VideoStreamer", "Output frame: " + info.size + " B, presentation time: " + info.presentationTimeUs);
+                    codec.releaseOutputBuffer(outputBufferIndex, false);
+                }
+            }
         }
+
+        codec.stop();
+        codec.release();
     }
 
     private class RawImage
