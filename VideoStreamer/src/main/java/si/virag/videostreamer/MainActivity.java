@@ -68,8 +68,9 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
         }
 
         Camera.Parameters params = cam.getParameters();
-        params.setPreviewSize(1280, 720);
+        params.setPreviewSize(720, 480);
         params.setRotation(90);
+        params.setPreviewFpsRange(30000, 30000);
         params.setFocusMode(Camera.Parameters.FOCUS_MODE_AUTO);
         params.setPreviewFormat(ImageFormat.YV12);
         params.setAutoExposureLock(false);
